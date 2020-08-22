@@ -3,7 +3,8 @@ import falcon
 import spacy
 import json
 import os
-import logging as log
+import logging
+from logstash_formatter import LogstashFormatter
 
 from spacy.symbols import ENT_TYPE, TAG, DEP
 import spacy.about
@@ -12,6 +13,13 @@ from .scripts.download import download_models
 
 from .parse import Parse, Entities, Sentences, SentencesDependencies
 
+logging.basicConfig(level=logging.DEBUG, format="[%(asctime)s] [%(process)d] [%(levelname)s] %(message)s")
+log = logging.getLogger()
+if os.getenv('REWE_BDP_STAGE') is not None:
+    loghandler = logging.StreamHandler()
+    loghandler.setFormatter(LogstashFormatter())
+    log.handlers = []
+    log.addHandler(loghandler)
 
 MODELS = os.getenv("languages", "").split()
 
@@ -227,7 +235,7 @@ class SentsDepResources(object):
                 'Sentence tokenization and Dependency parsing failed',
                 '{}'.format(e))
 
-log.basicConfig(format="[%(asctime)s] [%(process)d] [%(levelname)s] %(message)s", level=log.DEBUG)
+
 
 APP = falcon.API()
 APP.add_route('/dep', DepResource())

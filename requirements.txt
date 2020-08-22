@@ -3,3 +3,4 @@ falcon
 pytest
 requests
 gunicorn
+logstash-python-formatter
