@@ -222,6 +222,7 @@ class SentsDepResources(object):
             resp.append_header('Access-Control-Allow-Origin', "*")
             resp.status = falcon.HTTP_200
         except Exception as e:
+            log.error('Sentence tokenization and Dependency parsing failed!')
             raise falcon.HTTPBadRequest(
                 'Sentence tokenization and Dependency parsing failed',
                 '{}'.format(e))
