@@ -1,6 +1,6 @@
 .PHONY: clean start build-and-push test
 
-PYTHON3=python3.6
+PYTHON3=python
 
 all: env/bin/python
 
@@ -24,4 +24,5 @@ test: env/bin/python
 	env/bin/py.test displacy_service_tests
 
 start: env/bin/python
-	env/bin/run_server
+	env/bin/gunicorn -c config/gunicorn.conf.py displacy_service.server:APP
+	#env/bin/run_server

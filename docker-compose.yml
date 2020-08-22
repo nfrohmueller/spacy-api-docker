@@ -1,0 +1,14 @@
+version: '3'
+
+services:
+  spacyapi:
+    build:
+      context: .
+      dockerfile: Dockerfile-de
+    environment:
+      PORT: 3149
+      WEB_CONCURRENCY: 4
+    ports:
+      - 3148:3149
+      - 8000:8000
+    restart: always

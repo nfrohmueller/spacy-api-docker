@@ -3,10 +3,12 @@ import falcon
 import spacy
 import json
 import os
+import logging as log
 
 from spacy.symbols import ENT_TYPE, TAG, DEP
 import spacy.about
 import spacy.util
+from .scripts.download import download_models
 
 from .parse import Parse, Entities, Sentences, SentencesDependencies
 
@@ -21,6 +23,12 @@ def get_model(model_name):
         _models[model_name] = spacy.load(model_name)
     return _models[model_name]
 
+
+def initialize_models():
+    download_models()
+    for model in MODELS:
+        print(f"Loading model {model}")
+        get_model(model)
 
 def get_dep_types(model):
     '''List the available dep labels in the model.'''
@@ -44,6 +52,15 @@ def get_pos_types(model):
     for label_id in model.tagger.moves.freqs[TAG]:
         labels.append(model.vocab.strings[label_id])
     return labels
+
+def decode_request_body(req):
+    req_body = req.bounded_stream.read()
+    try:
+        return json.loads(req_body.decode('utf8'))
+    except Exception as e:
+        log.error(f"Error decoding json {req_body}")
+        raise falcon.HTTPBadRequest(f'Decoding json failed: {req_body}')
+
 
 
 class ModelsResource(object):
@@ -118,8 +135,7 @@ class DepResource(object):
     """
 
     def on_post(self, req, resp):
-        req_body = req.bounded_stream.read()
-        json_data = json.loads(req_body.decode('utf8'))
+        json_data = decode_request_body(req)
         text = json_data.get('text')
         model_name = json_data.get('model', 'en')
         collapse_punctuation = json_data.get('collapse_punctuation', True)
@@ -142,10 +158,10 @@ class EntResource(object):
     """Parse text and return displaCy ent's expected output."""
 
     def on_post(self, req, resp):
-        req_body = req.bounded_stream.read()
-        json_data = json.loads(req_body.decode('utf8'))
+        json_data = decode_request_body(req)
         text = json_data.get('text')
         model_name = json_data.get('model', 'en')
+        log.debug(f"Requesting ENT for '{text}' with model {model_name}")
         try:
             model = get_model(model_name)
             entities = Entities(model, text)
@@ -164,8 +180,7 @@ class SentsResources(object):
     """Returns sentences"""
 
     def on_post(self, req, resp):
-        req_body = req.bounded_stream.read()
-        json_data = json.loads(req_body.decode('utf8'))
+        json_data = decode_request_body(req)
         text = json_data.get('text')
         model_name = json_data.get('model', 'en')
 
@@ -187,8 +202,7 @@ class SentsDepResources(object):
     """Returns sentences and dependency parses"""
 
     def on_post(self, req, resp):
-        req_body = req.bounded_stream.read()
-        json_data = json.loads(req_body.decode('utf8'))
+        json_data = decode_request_body(req)
         text = json_data.get('text')
         model_name = json_data.get('model', 'en')
         collapse_punctuation = json_data.get('collapse_punctuation', False)
@@ -212,6 +226,7 @@ class SentsDepResources(object):
                 'Sentence tokenization and Dependency parsing failed',
                 '{}'.format(e))
 
+log.basicConfig(format="[%(asctime)s] [%(process)d] [%(levelname)s] %(message)s", level=log.DEBUG)
 
 APP = falcon.API()
 APP.add_route('/dep', DepResource())
