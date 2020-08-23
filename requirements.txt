@@ -4,3 +4,4 @@ pytest
 requests
 gunicorn
 logstash-python-formatter
+prometheus_client

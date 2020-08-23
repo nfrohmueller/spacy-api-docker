@@ -1,15 +1,18 @@
 #!/usr/bin/env python
+from urllib.parse import parse_qs, urlparse
+
 import falcon
 import spacy
 import json
 import os
+from copy import deepcopy
 import logging
 from logstash_formatter import LogstashFormatter
+from prometheus_client import REGISTRY, generate_latest, Summary
 
 from spacy.symbols import ENT_TYPE, TAG, DEP
 import spacy.about
 import spacy.util
-from .scripts.download import download_models
 
 from .parse import Parse, Entities, Sentences, SentencesDependencies
 
@@ -23,6 +26,9 @@ if os.getenv('REWE_BDP_STAGE') is not None:
 
 MODELS = os.getenv("languages", "").split()
 
+# Create a metric to track time spent and requests made.
+REQUEST_TIME = Summary('request_processing_seconds', 'Time spent processing request', labelnames=['method', 'endpoint'])
+
 _models = {}
 
 
@@ -31,12 +37,6 @@ def get_model(model_name):
         _models[model_name] = spacy.load(model_name)
     return _models[model_name]
 
-
-def initialize_models():
-    download_models()
-    for model in MODELS:
-        print(f"Loading model {model}")
-        get_model(model)
 
 def get_dep_types(model):
     '''List the available dep labels in the model.'''
@@ -61,6 +61,7 @@ def get_pos_types(model):
         labels.append(model.vocab.strings[label_id])
     return labels
 
+
 def decode_request_body(req):
     req_body = req.bounded_stream.read()
     try:
@@ -68,7 +69,6 @@ def decode_request_body(req):
     except Exception as e:
         log.error(f"Error decoding json {req_body}")
         raise falcon.HTTPBadRequest(f'Decoding json failed: {req_body}')
-
 
 
 class ModelsResource(object):
@@ -142,6 +142,10 @@ class DepResource(object):
     test with: curl -s localhost:8000/dep -d '{"text":"Pastafarians are smarter than people with Coca Cola bottles."}'
     """
 
+    ENDPOINT = '/dep'
+    R_TIME = REQUEST_TIME.labels(method='POST', endpoint=ENDPOINT)
+
+    @R_TIME.time()
     def on_post(self, req, resp):
         json_data = decode_request_body(req)
         text = json_data.get('text')
@@ -164,7 +168,10 @@ class DepResource(object):
 
 class EntResource(object):
     """Parse text and return displaCy ent's expected output."""
+    ENDPOINT = '/ent'
+    R_TIME = REQUEST_TIME.labels(method='POST', endpoint=ENDPOINT)
 
+    @R_TIME.time()
     def on_post(self, req, resp):
         json_data = decode_request_body(req)
         text = json_data.get('text')
@@ -187,6 +194,10 @@ class EntResource(object):
 class SentsResources(object):
     """Returns sentences"""
 
+    ENDPOINT = '/sents'
+    R_TIME = REQUEST_TIME.labels(method='POST', endpoint=ENDPOINT)
+
+    @R_TIME.time()
     def on_post(self, req, resp):
         json_data = decode_request_body(req)
         text = json_data.get('text')
@@ -208,7 +219,10 @@ class SentsResources(object):
 
 class SentsDepResources(object):
     """Returns sentences and dependency parses"""
+    ENDPOINT = '/sents_dep'
+    R_TIME = REQUEST_TIME.labels(method='POST', endpoint=ENDPOINT)
 
+    @R_TIME.time()
     def on_post(self, req, resp):
         json_data = decode_request_body(req)
         text = json_data.get('text')
@@ -236,12 +250,25 @@ class SentsDepResources(object):
                 '{}'.format(e))
 
 
+class MetricsResources(object):
+    registry = REGISTRY
+
+    def on_get(self, req, resp):
+        registry = self.registry
+        # Bake output
+        output = generate_latest(registry)
+        # Return output
+        resp.body = output
+        resp.status = falcon.HTTP_200
+        resp.content_type = falcon.MEDIA_TEXT
+
 
 APP = falcon.API()
-APP.add_route('/dep', DepResource())
-APP.add_route('/ent', EntResource())
-APP.add_route('/sents', SentsResources())
-APP.add_route('/sents_dep', SentsDepResources())
+APP.add_route(DepResource.ENDPOINT, DepResource())
+APP.add_route(EntResource.ENDPOINT, EntResource())
+APP.add_route(SentsResources.ENDPOINT, SentsResources())
+APP.add_route(SentsDepResources.ENDPOINT, SentsDepResources())
 APP.add_route('/{model_name}/schema', SchemaResource())
 APP.add_route('/models', ModelsResource())
 APP.add_route('/version', VersionResource())
+APP.add_route('/admin/prometheus', MetricsResources())
