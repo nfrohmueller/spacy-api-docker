@@ -1,0 +1,24 @@
+service:
+  name: bdomm-natural-language-processor
+  replicas: 3
+  port: 3149
+
+livenessProbe:
+  httpGet:
+    path: /version
+
+readinessProbe:
+  httpGet:
+    path: /version
+
+resources:
+  requests:
+    cpu: 0.1
+    memory: 0.5Gi
+  limits:
+    cpu: 1
+    memory: 2Gi
+
+customEnvs:
+  - name: PORT
+    value: 3149
