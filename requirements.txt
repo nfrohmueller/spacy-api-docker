@@ -1,7 +1,7 @@
-spacy
-falcon
-pytest
-requests
-gunicorn
-logstash-python-formatter
-prometheus_client
+spacy==2.3.2
+falcon==2.0.0
+pytest==6.0.1
+requests==2.24.0
+gunicorn==20.0.4
+logstash-python-formatter==0.1.2
+prometheus_client==0.8.0
