@@ -1,11 +1,8 @@
 #!/usr/bin/env python
-from urllib.parse import parse_qs, urlparse
-
 import falcon
 import spacy
 import json
 import os
-from copy import deepcopy
 import logging
 from logstash_formatter import LogstashFormatter
 from prometheus_client import REGISTRY, generate_latest, Summary
@@ -67,7 +64,7 @@ def decode_request_body(req):
     try:
         return json.loads(req_body.decode('utf8'))
     except Exception as e:
-        log.error(f"Error decoding json {req_body}")
+        log.error(f"Error decoding json {req_body}", exc_info=True)
         raise falcon.HTTPBadRequest(f'Decoding json failed: {req_body}')
 
 
@@ -81,10 +78,11 @@ class ModelsResource(object):
         try:
             output = list(MODELS)
             resp.body = json.dumps(output, sort_keys=True, indent=2)
-            resp.content_type = 'text/string'
+            resp.content_type = falcon.MEDIA_JSON
             resp.append_header('Access-Control-Allow-Origin', "*")
             resp.status = falcon.HTTP_200
         except Exception as e:
+            log.error('Models retrieval failed!', exc_info=True)
             raise falcon.HTTPInternalServerError(
                 'Models retrieval failed',
                 '{}'.format(e))
@@ -101,10 +99,11 @@ class VersionResource(object):
             resp.body = json.dumps({
                 "spacy": spacy.about.__version__
             }, sort_keys=True, indent=2)
-            resp.content_type = 'text/string'
+            resp.content_type = falcon.MEDIA_JSON
             resp.append_header('Access-Control-Allow-Origin', "*")
             resp.status = falcon.HTTP_200
         except Exception as e:
+            log.error('Version retrieval failed!', exc_info=True)
             raise falcon.HTTPInternalServerError(
                 'Version retrieval failed',
                 '{}'.format(e))
@@ -127,10 +126,11 @@ class SchemaResource(object):
             }
 
             resp.body = json.dumps(output, sort_keys=True, indent=2)
-            resp.content_type = 'text/string'
+            resp.content_type = falcon.MEDIA_JSON
             resp.append_header('Access-Control-Allow-Origin', "*")
             resp.status = falcon.HTTP_200
         except Exception as e:
+            log.error('Schema construction failed!', exc_info=True)
             raise falcon.HTTPBadRequest(
                 'Schema construction failed',
                 '{}'.format(e))
@@ -157,10 +157,11 @@ class DepResource(object):
             model = get_model(model_name)
             parse = Parse(model, text, collapse_punctuation, collapse_phrases)
             resp.body = json.dumps(parse.to_json(), sort_keys=True, indent=2)
-            resp.content_type = 'text/string'
+            resp.content_type = falcon.MEDIA_JSON
             resp.append_header('Access-Control-Allow-Origin', "*")
             resp.status = falcon.HTTP_200
         except Exception as e:
+            log.error('Dependency parsing failed!', exc_info=True)
             raise falcon.HTTPBadRequest(
                 'Dependency parsing failed',
                 '{}'.format(e))
@@ -182,10 +183,11 @@ class EntResource(object):
             entities = Entities(model, text)
             resp.body = json.dumps(entities.to_json(), sort_keys=True,
                                    indent=2)
-            resp.content_type = 'text/string'
+            resp.content_type = falcon.MEDIA_JSON
             resp.append_header('Access-Control-Allow-Origin', "*")
             resp.status = falcon.HTTP_200
         except Exception as e:
+            log.error('Text parsing failed!', exc_info=True)
             raise falcon.HTTPBadRequest(
                 'Text parsing failed',
                 '{}'.format(e))
@@ -208,10 +210,11 @@ class SentsResources(object):
             sentences = Sentences(model, text)
             resp.body = json.dumps(sentences.to_json(), sort_keys=True,
                                    indent=2)
-            resp.content_type = 'text/string'
+            resp.content_type = falcon.MEDIA_JSON
             resp.append_header('Access-Control-Allow-Origin', "*")
             resp.status = falcon.HTTP_200
         except Exception as e:
+            log.error('Sentence tokenization failed!', exc_info=True)
             raise falcon.HTTPBadRequest(
                 'Sentence tokenization failed',
                 '{}'.format(e))
@@ -240,11 +243,11 @@ class SentsDepResources(object):
             resp.body = json.dumps(sentences.to_json(),
                                    sort_keys=True,
                                    indent=2)
-            resp.content_type = 'text/string'
+            resp.content_type = falcon.MEDIA_JSON
             resp.append_header('Access-Control-Allow-Origin', "*")
             resp.status = falcon.HTTP_200
         except Exception as e:
-            log.error('Sentence tokenization and Dependency parsing failed!')
+            log.error('Sentence tokenization and Dependency parsing failed!', exc_info=True)
             raise falcon.HTTPBadRequest(
                 'Sentence tokenization and Dependency parsing failed',
                 '{}'.format(e))
